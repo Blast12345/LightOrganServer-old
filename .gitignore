@@ -1,0 +1,17 @@
+# Mac stuff
+.DS_Store
+
+# User-specific stuff
+.idea
+
+# Gradle
+.idea/**/gradle.xml
+.idea/**/libraries
+.gradle
+build/
+gradle-app.setting
+!gradle-wrapper.jar
+.idea/workspace.xml
+
+# IntelliJ
+out/
