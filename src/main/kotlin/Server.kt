@@ -8,7 +8,7 @@ import kotlin.concurrent.thread
 //Reference:
 //https://gist.github.com/Silverbaq/a14fe6b3ec57703e8cc1a63b59605876
 
-fun main(args: Array<String>) {
+fun main() {
     val server = ServerSocket(9999)
     println("Server is running on port ${server.localPort}")
 
@@ -32,6 +32,7 @@ class ClientHandler(client: Socket) {
         running = true
 
         while (running) {
+            println("WRITING DATA")
             write("Fake Data!")
         }
     }
