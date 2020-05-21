@@ -1,28 +1,72 @@
-
 import java.io.OutputStream
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.charset.Charset
 import java.util.*
 import kotlin.concurrent.thread
+import java.io.File
+import javax.sound.sampled.*
 
-//Reference:
-//https://gist.github.com/Silverbaq/a14fe6b3ec57703e8cc1a63b59605876
+const val RECORD_TIME = 10000L // ten seconds
+fun testRecording() {
+    val foobar = InputManager()
+    val inputs = foobar.getInputs() //TODO: How to pick input
+    val line = inputs[0] as TargetDataLine
+    val format = line.format
+    val info = DataLine.Info(TargetDataLine::class.java, format)
+
+    val wavFile = File("RecordAudio.wav")
+    val fileType = AudioFileFormat.Type.WAVE
+//    val format = AudioFormat(16000.0f, 16, 2, true, true)
+//    val info = DataLine.Info(TargetDataLine::class.java, format)
+//    val line = AudioSystem.getLine(info) as TargetDataLine
+
+    // Creates a new thread that waits for 'RECORD_TIME' before stopping
+    Thread(Runnable {
+        try {
+            Thread.sleep(RECORD_TIME)
+        } catch (ie: InterruptedException) {
+            println(ie.message)
+        } finally {
+            line.stop()
+            line.close()
+        }
+        println("Finished")
+    }).start()
+
+    // Captures the sound and saves it in a WAV file
+    try {
+        if (AudioSystem.isLineSupported(info)) {
+            line.open(format)
+            line.start()
+            println("Recording started")
+            AudioSystem.write(AudioInputStream(line), fileType, wavFile)
+        }
+        else println("Line not supported")
+    }
+    catch (lue: LineUnavailableException) {
+        println(lue.message)
+    }
+}
 
 fun main() {
-    val server = ServerSocket(9999)
-    println("Server is running on port ${server.localPort}")
-
-    while (true) {
-        val client = server.accept()
-        println("Client connected: ${client.inetAddress.hostAddress}")
-
-        // This timeout is fairly arbitrary; I just don't want to keep firing data to clients that no longer exist.
-        client.soTimeout = 1000
-
-        // Run client in it's own thread.
-        thread { ClientHandler(client).run() }
-    }
+    testRecording()
+//    val server = ServerSocket(9999)
+//    println("Server is running on port ${server.localPort}")
+//
+//    val foobar = SoundProcessor()
+//    foobar.process()
+//
+//    while (true) {
+//        val client = server.accept()
+//        println("Client connected: ${client.inetAddress.hostAddress}")
+//
+//        // This timeout is fairly arbitrary; I just don't want to keep firing data to clients that no longer exist.
+//        client.soTimeout = 1000
+//
+//        // Run client in it's own thread.
+//        thread { ClientHandler(client).run() }
+//    }
 }
 
 class ClientHandler(client: Socket) {
