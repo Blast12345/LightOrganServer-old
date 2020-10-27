@@ -3,9 +3,16 @@ import java.net.Socket
 import java.nio.charset.Charset
 import java.util.*
 
+//High Level Todos
+//TODO: Add preconditions/validation to functions (e.g. target frequency must be greater than 0)
+
 fun main() {
     val foo = SoundProcessor()
-    foo.startListening()
+    foo.startListening(25.0) { frequencyData ->
+        val max = frequencyData.maxBy { it.amplitude }
+        println(max?.frequency)
+        //TODO: Send to color generator
+    }
 //    val server = ServerSocket(9999)
 //    println("Server is running on port ${server.localPort}")
 //

@@ -8,56 +8,75 @@ import javax.sound.sampled.UnsupportedAudioFileException
 import kotlin.math.pow
 import kotlin.math.sqrt
 
-
 class SoundProcessor {
 
-    //Ideally I'd capture a minimum frequency of 20hz (give or take)
-    //20hz means a sample every 0.05 seconds
-    //48000hz means a sample every 0.000020833333333 seconds
-    //I can infer that a 20 hz signal would require 2500 samples (0.05 / 0.00002 = 2400)
-    //The sample size must be to the power of 2 for FFT; I would need 4096 samples to identify a 20hz signal.
-    //I could cut the number of samples (and thus time) in half by capturing 2048 samples; this would give me a min frequency of 24hz.
-    //24hz is definitely worth the tradeoff considering music seldom goes this low
+    private var audioSamplingThread: Thread? = null
 
-    val kSampleSize = 2048 //TODO: Calculate dynamically based on the sample rate
+    // NOTE: The lower the frequency, the more samples (and time) it takes to fill the buffer.
+    // This will also lead to higher processing times as the FFT needs to process a larger dataset.
+    fun startListening(lowestFrequency: Double, output: (List<FrequencySample>) -> Unit) {
+        audioSamplingThread?.interrupt()
 
-    fun startListening() { //TODO: Add condition for prefer performance (pad LF up) vs quality (pad LF down)
-        //TODO: Improve how to pick input
-        var line = InputManager().getInputs()[0] as TargetDataLine
+        // Open the line-in
+        var line = InputManager().getInputs()[0] as TargetDataLine //TODO: Improve how to pick input
 
-        //Open the line
-        line.open(line.format, line.format.frameSize * kSampleSize)
+        val sampleSize = calculateSampleSize(lowestFrequency, line.format.sampleRate)
+        val bufferSize = sampleSize * line.format.frameSize //Multiply by frame size to account for bit depth (e.g. 16 bit audio takes 2 bytes per sample)
+
+        line.open(line.format, bufferSize)
         line.start()
 
-        //Retrieve Audio
-        val buffer = ByteArray(line.bufferSize)
-        var wave: DoubleArray
+        // Retrieve audio data
+        audioSamplingThread = Thread(Runnable {
+            var buffer = ByteArray(line.bufferSize)
 
-        val audioSamplingThread = Thread(Runnable {
             while (true) {
-                //TODO: Try to make a rolling buffer; for example - if we need 4096 samples to compute, but they only come in 1024 at a time, then insert using FIFO so FFT and compute on more incremental data
-                val readBytes = line.read(buffer, 0, buffer.count())
-                wave = convert(buffer, line.format)
+                // We gather data into a rolling buffer (First-In-First-Out)
+                // E.g. Buffer size of 4096 updating in increments of 1024 means we can update the rolling buffer 4 times
+                // in the same time it would take to get a full 4096 samples
+                val newData = ByteArray(line.available())
+                val readBytes = line.read(newData, 0, newData.count())
+                val rolloverData = buffer.drop(readBytes).toByteArray()
+                buffer = rolloverData + newData
 
-                val fftData = process(wave, line.format)
+                // Process FFT
+                val wave = doubleArrayFrom(buffer, line.format)
+                val fftData = processFFT(wave, line.format)
+                val frequencySamples = FrequencySample.listFrom(fftData, line.format.sampleRate.toDouble(), sampleSize)
+                output(frequencySamples)
             }
         })
 
-        audioSamplingThread.start()
+        audioSamplingThread?.start()
     }
 
-    //Reference: https://stackoverflow.com/questions/29560491/fourier-transforming-a-byte-array
-    private fun convert(bytes: ByteArray, format: AudioFormat): DoubleArray {
-        //Audio Info
+    fun stopListening() {
+        audioSamplingThread?.interrupt()
+    }
+
+    // Given a 48000hz sample rate, I can infer that a 20hz sample rate would require 2400 samples (48000 / 20 = 2400)
+    // The sample size must be to the power of 2 for FFT; I would need 4096 samples to identify a 20hz signal.
+    private fun calculateSampleSize(lowestFrequency: Double, samplingRate: Float): Int {
+        val necessarySamples = samplingRate / lowestFrequency
+
+        var power = 0
+        while (2.0.pow(power) < necessarySamples) { power += 1 }
+
+        return 2.0.pow(power).toInt()
+    }
+
+    // Reference: https://stackoverflow.com/questions/29560491/fourier-transforming-a-byte-array
+    private fun doubleArrayFrom(bytes: ByteArray, format: AudioFormat): DoubleArray {
+        // Audio Info
         val bits = format.sampleSizeInBits
         val max = 2.0.pow(bits.toDouble() - 1)
 
-        //Buffer
+        // Buffer
         val byteOrder = if (format.isBigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN
         val buffer = ByteBuffer.wrap(bytes)
         buffer.order(byteOrder)
 
-        //Samples
+        // Samples
         var samples = DoubleArray(bytes.count() * 8 / bits)
 
         for (i in 0 until samples.count()) {
@@ -73,27 +92,20 @@ class SoundProcessor {
         return samples
     }
 
-    //Reference: https://github.com/wendykierp/JTransforms/issues/4
-    private fun process(signal: DoubleArray, format: AudioFormat): DoubleArray {
-        //Perform FFT
+    // Reference: https://github.com/wendykierp/JTransforms/issues/4
+    private fun processFFT(signal: DoubleArray, format: AudioFormat): DoubleArray {
+        // Perform FFT
         val doubleFFT = DoubleFFT_1D(signal.count().toLong())
         doubleFFT.realForward(signal)
 
-        //Prepare results
+        // Prepare results
         val result = DoubleArray(signal.count() / 2)
 
-        for (s in result.indices) {
-            val re = signal[s * 2]
-            val im = signal[s * 2 + 1]
-            result[s] = sqrt(re * re + im * im) / result.size
+        for (i in result.indices) {
+            val re = signal[i * 2]
+            val im = signal[i * 2 + 1]
+            result[i] = sqrt(re * re + im * im) / result.size
         }
-
-        //Determine peak frequency (temporary)
-        //TODO: This is peak frequency frame, NOT PEAK FREQUENCY! Fix.
-        val maxValue = result.max()
-        val maxIndex = result.indexOfFirst { it == maxValue }
-
-        println(maxIndex * format.sampleRate / kSampleSize)
 
         return result
     }
