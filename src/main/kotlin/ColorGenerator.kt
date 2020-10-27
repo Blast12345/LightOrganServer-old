@@ -21,7 +21,7 @@ class ColorGenerator() {
         }
 
         val averageFrequency = weightedAmplitude / totalAmplitude
-        println(averageFrequency)
+        println(averageFrequency) //TODO: Average frequency is VERY noisy.
 
         // Calculate the RGB values
         val minimumFrequency = relevantFrequencyData.first().frequency
