@@ -7,10 +7,11 @@ import java.util.*
 //TODO: Add preconditions/validation to functions (e.g. target frequency must be greater than 0)
 
 fun main() {
-    val foo = SoundService()
-    foo.startListening(25.0) { frequencyData ->
-        val max = frequencyData.maxBy { it.amplitude }
-        println(max?.frequency)
+    val soundService = SoundService()
+    val colorGenerator = ColorGenerator()
+
+    soundService.startListening(25.0) { frequencyData ->
+        val bassColor = colorGenerator.calculateBassColor(frequencyData, 110.0)
         //TODO: Send to color generator
     }
 //    val server = ServerSocket(9999)
