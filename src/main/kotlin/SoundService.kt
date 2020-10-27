@@ -31,6 +31,9 @@ class SoundService {
             var buffer = ByteArray(line.bufferSize)
 
             while (true) {
+                // We only need to retrieve data and process the output if new data is available
+                if (line.available() <= 0) { continue }
+
                 // We gather data into a rolling buffer (First-In-First-Out)
                 // E.g. Buffer size of 4096 updating in increments of 1024 means we can update the rolling buffer 4 times
                 // in the same time it would take to get a full 4096 samples
