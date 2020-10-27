@@ -8,7 +8,7 @@ import javax.sound.sampled.UnsupportedAudioFileException
 import kotlin.math.pow
 import kotlin.math.sqrt
 
-class SoundProcessor {
+class SoundService {
 
     private var audioSamplingThread: Thread? = null
 

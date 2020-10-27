@@ -7,7 +7,7 @@ import java.util.*
 //TODO: Add preconditions/validation to functions (e.g. target frequency must be greater than 0)
 
 fun main() {
-    val foo = SoundProcessor()
+    val foo = SoundService()
     foo.startListening(25.0) { frequencyData ->
         val max = frequencyData.maxBy { it.amplitude }
         println(max?.frequency)
