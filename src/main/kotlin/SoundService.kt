@@ -1,71 +1,50 @@
-
 import org.jtransforms.fft.DoubleFFT_1D
+import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.sound.sampled.AudioFormat
-import javax.sound.sampled.TargetDataLine
+import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.UnsupportedAudioFileException
+import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.sqrt
 
-class SoundService {
 
-    private var audioSamplingThread: Thread? = null
+class SoundService {
 
     // NOTE: The lower the frequency, the more samples (and time) it takes to fill the buffer.
     // This will also lead to higher processing times as the FFT needs to process a larger dataset.
     fun startListening(lowestFrequency: Double, output: (List<FrequencySample>) -> Unit) {
-        audioSamplingThread?.interrupt()
+        //WAV Testing
+        val fileIn = File("40hz.wav") //44.1khz 16-bit
+        val line = AudioSystem.getAudioInputStream(fileIn)
 
-        // Open the line-in
-        var line = InputManager().getInputs()[0] as TargetDataLine //TODO: Improve how to pick input
+        // Determine sample size
+        // 2048 should be sufficient; 40hz signal takes 0.025 seconds and 2048 will contain ~0.046 of audio (2048/44100)
+        val sampleSize = 2048
 
-        val sampleSize = calculateSampleSize(lowestFrequency, line.format.sampleRate)
-        val bufferSize = sampleSize * line.format.frameSize //Multiply by frame size to account for bit depth (e.g. 16 bit audio takes 2 bytes per sample)
+        // Buffer size needs to factor in frameSize to account for bit depth (e.g. 16 bit audio takes 2 bytes per sample)
+        val bufferSize = sampleSize * line.format.frameSize
+        var buffer = ByteArray(bufferSize)
 
-        line.open(line.format, bufferSize)
-        line.start()
+        // Read data into the buffer
+        val readBytes = line.read(buffer, 0, buffer.count())
 
-        // Retrieve audio data
-        audioSamplingThread = Thread(Runnable {
-            var buffer = ByteArray(line.bufferSize)
 
-            while (true) {
-                // We only need to retrieve data and process the output if new data is available
-                if (line.available() <= 0) { continue }
+        val wave = doubleArrayFrom(buffer, line.format)
+        val waveAfterHanning = DoubleArray(wave.count())
 
-                // We gather data into a rolling buffer (First-In-First-Out)
-                // E.g. Buffer size of 4096 updating in increments of 1024 means we can update the rolling buffer 4 times
-                // in the same time it would take to get a full 4096 samples
-                val newData = ByteArray(line.available())
-                val readBytes = line.read(newData, 0, newData.count())
-                val rolloverData = buffer.drop(readBytes).toByteArray()
-                buffer = rolloverData + newData
+        //Windowing
+        for (i in wave.indices) {
+            val multiplier: Double = 0.5 * (1 - cos(2 * PI * i / (wave.count() - 1)))
+            waveAfterHanning[i] = multiplier * wave[i]
+        }
 
-                // Process FFT
-                val wave = doubleArrayFrom(buffer, line.format)
-                val fftData = processFFT(wave, line.format)
-                val frequencySamples = FrequencySample.listFrom(fftData, line.format.sampleRate.toDouble(), sampleSize)
-                output(frequencySamples)
-            }
-        })
-
-        audioSamplingThread?.start()
-    }
-
-    fun stopListening() {
-        audioSamplingThread?.interrupt()
-    }
-
-    // Given a 48000hz sample rate, I can infer that a 20hz sample rate would require 2400 samples (48000 / 20 = 2400)
-    // The sample size must be to the power of 2 for FFT; I would need 4096 samples to identify a 20hz signal.
-    private fun calculateSampleSize(lowestFrequency: Double, samplingRate: Float): Int {
-        val necessarySamples = samplingRate / lowestFrequency
-
-        var power = 0
-        while (2.0.pow(power) < necessarySamples) { power += 1 }
-
-        return 2.0.pow(power).toInt()
+        //FFT
+        val fftData = processFFT(wave)
+        val frequencySamples = FrequencySample.listFrom(fftData, line.format.sampleRate.toDouble(), sampleSize)
+        output(frequencySamples)
     }
 
     // Reference: https://stackoverflow.com/questions/29560491/fourier-transforming-a-byte-array
@@ -82,7 +61,7 @@ class SoundService {
         // Samples
         var samples = DoubleArray(bytes.count() * 8 / bits)
 
-        for (i in 0 until samples.count()) {
+        for (i in samples.indices)  {
             when (bits) {
                 8 -> samples[i] = buffer.get() / max
                 16 -> samples[i] = buffer.short / max
@@ -96,21 +75,21 @@ class SoundService {
     }
 
     // Reference: https://github.com/wendykierp/JTransforms/issues/4
-    private fun processFFT(signal: DoubleArray, format: AudioFormat): DoubleArray {
+    private fun processFFT(signal: DoubleArray): DoubleArray {
         // Perform FFT
         val doubleFFT = DoubleFFT_1D(signal.count().toLong())
         doubleFFT.realForward(signal)
 
         // Prepare results
-        val result = DoubleArray(signal.count() / 2)
+        val magnitudes = DoubleArray(signal.count() / 2)
 
-        for (i in result.indices) {
-            val re = signal[i * 2]
-            val im = signal[i * 2 + 1]
-            result[i] = sqrt(re * re + im * im) / result.size
+        for (i in magnitudes.indices) {
+            val re = signal[2 * i]
+            val im = signal[2 * i + 1]
+            magnitudes[i] = sqrt(re * re + im * im) // / magnitudes.size
         }
 
-        return result
+        return magnitudes
     }
 
 }
