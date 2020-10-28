@@ -17,7 +17,7 @@ class FrequencySample(val frequency: Double, val amplitude: Double) {
     }
 
     override fun toString(): String {
-        return "$frequency:$amplitude"
+        return "$frequency:${amplitude.toBigDecimal()}"
     }
 
 }
