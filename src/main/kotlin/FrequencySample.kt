@@ -1,5 +1,5 @@
 
-class FrequencySample(val frequency: Double, val amplitude: Double) {
+class FrequencySample(val frequency: Double, var amplitude: Double) {
 
     companion object {
         fun listFrom(fftData: DoubleArray, sampleRate: Double, sampleSize: Int): List<FrequencySample> {

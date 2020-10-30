@@ -1,15 +1,19 @@
 import jdk.jfr.Frequency
+import kotlin.math.pow
 
 class ColorGenerator() {
 
     fun calculateBassColor(frequencyData: List<FrequencySample>, highpassFrequency: Double): RGB {
-        //TODO: Apply noise filter?
-
         // We need to filter out data above the highpass
         // This must include the bin of the highpass or we will accidentally trim frequencies we want
         val sortedFrequencyData = frequencyData.sortedBy { it.frequency }
         val upperFrequencyIndex = sortedFrequencyData.indexOfFirst { it.frequency > highpassFrequency } + 1
         val relevantFrequencyData = sortedFrequencyData.subList(0, upperFrequencyIndex)
+
+        // Exponentially increase the amplitude to increase separation of signal from background noise
+        // TODO: Write logic to calculate background noise or filter it out?
+        // TODO: Design amplitude roll-off for upper frequency range
+        relevantFrequencyData.forEach { it.amplitude = it.amplitude.pow(8) }
 
         // Find the average frequency
         var weightedAmplitude = 0.0
