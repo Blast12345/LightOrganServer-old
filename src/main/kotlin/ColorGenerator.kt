@@ -3,14 +3,14 @@ import kotlin.math.pow
 
 class ColorGenerator() {
 
-    fun calculateBassColor(frequencyData: List<FrequencySample>, highpassFrequency: Double): RGB {
-        // We need to filter out data above the highpass
-        // This must include the bin of the highpass or we will accidentally trim frequencies we want
+    fun calculateBassColor(frequencyData: List<FrequencySample>, lowPassFrequency: Double): RGB {
+        // Only include data below the LP frequency (plus one bin up to ensure that we include everything up to the LP)
         val sortedFrequencyData = frequencyData.sortedBy { it.frequency }
-        val upperFrequencyIndex = sortedFrequencyData.indexOfFirst { it.frequency > highpassFrequency } + 1
+        val upperFrequencyIndex = sortedFrequencyData.indexOfFirst { it.frequency > lowPassFrequency } + 1
         val relevantFrequencyData = sortedFrequencyData.subList(0, upperFrequencyIndex)
 
-        // Exponentially increase the amplitude to increase separation of signal from background noise
+        // Apply filtering to the range to ensure that we get a reasonable output:
+        // 1. Exponentially increase the amplitude to increase separation of signal from background noise
         // TODO: Write logic to calculate background noise or filter it out?
         // TODO: Design amplitude roll-off for upper frequency range
         relevantFrequencyData.forEach { it.amplitude = it.amplitude.pow(8) }
@@ -25,7 +25,7 @@ class ColorGenerator() {
         }
 
         val averageFrequency = weightedAmplitude / totalAmplitude
-        println(averageFrequency) //TODO: Average frequency is VERY noisy.
+        println(averageFrequency)
 
         // Calculate the RGB values
         val minimumFrequency = relevantFrequencyData.first().frequency
@@ -35,7 +35,11 @@ class ColorGenerator() {
         val g = colorWave(-(2 * 256), averageFrequency, minimumFrequency, maximumFrequency)
         val b = colorWave(-(4 * 256), averageFrequency, minimumFrequency, maximumFrequency)
 
-        return RGB(r, g, b)
+        return if (averageFrequency.isNaN()) {
+            RGB(0, 0, 0)
+        } else {
+            RGB(r, g, b)
+        }
     }
 
     // @ColeKainz
