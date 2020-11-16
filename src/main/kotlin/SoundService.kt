@@ -22,7 +22,7 @@ class SoundService {
         // Open the line-in
         // Buffer size needs to factor in frameSize to account for bit depth (e.g. 16 bit audio takes 2 bytes per sample)
         var line = InputManager().getInputs()[0] as TargetDataLine //TODO: Improve how to pick input
-        val sampleSize = calculateSampleSize(lowestFrequency, line.format.sampleRate)
+        val sampleSize = calculateSampleSize(lowestFrequency, line.format.sampleRate) * 2
         val bufferSize = sampleSize * line.format.frameSize
 
         line.open(line.format, bufferSize)

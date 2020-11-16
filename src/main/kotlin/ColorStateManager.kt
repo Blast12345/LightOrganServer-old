@@ -10,7 +10,7 @@ class ColorStateManager {
             val output: MutableList<RGB> = mutableListOf()
 
             for (led in 1..count) { //Maybe do 0 to count-1?
-                val first = currentColors.first()
+                val first = if (currentColors.isEmpty()) { RGB(0,0,0) } else { currentColors.first() }
                 output.add(first)
             }
 

@@ -13,27 +13,36 @@ class ColorGenerator() {
         // Exponentially increase the amplitude to increase separation of signal from background noise
         // TODO: Write logic to calculate background noise or filter it out?
         // TODO: Design amplitude roll-off for upper frequency range
+        relevantFrequencyData.forEach {
+            if (it.amplitude < 0.1) {
+                it.amplitude = 0.0
+            }
+        }
         relevantFrequencyData.forEach { it.amplitude = it.amplitude.pow(8) }
 
         // Find the average frequency
         var weightedAmplitude = 0.0
         var totalAmplitude = 0.0
 
+        //TODO: This equation yields 40hz ranges too often; maybe build a different algorithm for picking optimal frequency?
         relevantFrequencyData.forEach { frequencySample ->
             weightedAmplitude += (frequencySample.frequency * frequencySample.amplitude)
             totalAmplitude += frequencySample.amplitude
+        }
+
+        if (totalAmplitude == 0.0) {
+            return RGB(0, 0, 0)
         }
 
         val averageFrequency = weightedAmplitude / totalAmplitude
         println(averageFrequency) //TODO: Average frequency is VERY noisy.
 
         // Calculate the RGB values
-        val minimumFrequency = relevantFrequencyData.first().frequency
-        val maximumFrequency = relevantFrequencyData.last().frequency
+        val minimumFrequency = 30.0
 
-        val r = colorWave(-(0 * 256), averageFrequency, minimumFrequency, maximumFrequency)
-        val g = colorWave(-(2 * 256), averageFrequency, minimumFrequency, maximumFrequency)
-        val b = colorWave(-(4 * 256), averageFrequency, minimumFrequency, maximumFrequency)
+        val r = colorWave(-(0 * 256) + 1024, averageFrequency, minimumFrequency, highpassFrequency)
+        val g = colorWave(-(2 * 256) + 1024, averageFrequency, minimumFrequency, highpassFrequency)
+        val b = colorWave(-(4 * 256) + 1024, averageFrequency, minimumFrequency, highpassFrequency)
 
         return RGB(r, g, b)
     }
