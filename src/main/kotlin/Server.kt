@@ -1,35 +1,37 @@
 import java.io.OutputStream
+import java.net.ServerSocket
 import java.net.Socket
 import java.nio.charset.Charset
 import java.util.*
+import kotlin.concurrent.thread
 
 //High Level Todos
 //TODO: Add preconditions/validation to functions (e.g. target frequency must be greater than 0)
 
 fun main() {
+    val server = ServerSocket(9999)
+    println("Server is running on port ${server.localPort}")
+
+    // Written sloppily for testing
     val soundService = SoundService()
     val colorGenerator = ColorGenerator()
-
     soundService.startListening(25.0) { frequencyData ->
-        val bassColor = colorGenerator.calculateBassColor(frequencyData, 110.0)
+        val bassColor = colorGenerator.calculateBassColor(frequencyData, 110.0) //TODO: Set minimum frequency
         //TODO: Send to color generator
+        ColorStateManager.currentColors.clear()
+        ColorStateManager.currentColors.add(bassColor)
     }
-//    val server = ServerSocket(9999)
-//    println("Server is running on port ${server.localPort}")
-//
-//    val foobar = SoundProcessor()
-//    foobar.process()
-//
-//    while (true) {
-//        val client = server.accept()
-//        println("Client connected: ${client.inetAddress.hostAddress}")
-//
-//        // This timeout is fairly arbitrary; I just don't want to keep firing data to clients that no longer exist.
-//        client.soTimeout = 1000
-//
-//        // Run client in it's own thread.
-//        thread { ClientHandler(client).run() }
-//    }
+
+    while (true) {
+        val client = server.accept()
+        println("Client connected: ${client.inetAddress.hostAddress}")
+
+        // This timeout is fairly arbitrary; I just don't want to keep firing data to clients that no longer exist.
+        client.soTimeout = 1000
+
+        // Run client in it's own thread.
+        thread { ClientHandler(client).run() }
+    }
 }
 
 class ClientHandler(client: Socket) {
