@@ -13,7 +13,14 @@ class ColorGenerator() {
         // 1. Exponentially increase the amplitude to increase separation of signal from background noise
         // TODO: Write logic to calculate background noise or filter it out?
         // TODO: Design amplitude roll-off for upper frequency range
-        relevantFrequencyData.forEach { it.amplitude = it.amplitude.pow(8) }
+        relevantFrequencyData.forEach { frequencySample ->
+            if (frequencySample.amplitude < 0.001) {
+                frequencySample.amplitude = 0.0
+            }
+        }
+
+//        relevantFrequencyData.forEach { it.amplitude = it.amplitude.pow(8) }
+
 
         // Find the average frequency
         var weightedAmplitude = 0.0
@@ -28,7 +35,7 @@ class ColorGenerator() {
         println(averageFrequency)
 
         // Calculate the RGB values
-        val minimumFrequency = relevantFrequencyData.first().frequency
+        val minimumFrequency = relevantFrequencyData[2].frequency //TODO: Testing only
         val maximumFrequency = relevantFrequencyData.last().frequency
 
         val r = colorWave(-(0 * 256), averageFrequency, minimumFrequency, maximumFrequency)
