@@ -10,6 +10,8 @@ import kotlin.concurrent.thread
 
 fun main() {
     val server = ServerSocket(9999)
+    server.setPerformancePreferences(1, 2, 0)
+
     println("Server is running on port ${server.localPort}")
 
     // Written sloppily for testing
@@ -28,6 +30,7 @@ fun main() {
 
         // This timeout is fairly arbitrary; I just don't want to keep firing data to clients that no longer exist.
         client.soTimeout = 1000
+        client.tcpNoDelay = true;
 
         // Run client in it's own thread.
         thread { ClientHandler(client).run() }
