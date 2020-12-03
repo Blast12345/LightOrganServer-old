@@ -1,20 +1,12 @@
-import java.io.OutputStream
-import java.net.ServerSocket
-import java.net.Socket
-import java.nio.charset.Charset
+import java.net.DatagramSocket
 import java.util.*
-import kotlin.concurrent.thread
+
 
 //High Level Todos
 //TODO: Add preconditions/validation to functions (e.g. target frequency must be greater than 0)
 
 fun main() {
-    val server = ServerSocket(9999)
-    server.setPerformancePreferences(1, 2, 0)
-
-    println("Server is running on port ${server.localPort}")
-
-    // Written sloppily for testing
+    // Sound capture
     val soundService = SoundService()
     val colorGenerator = ColorGenerator()
     soundService.startListening(25.0) { frequencyData ->
@@ -24,69 +16,100 @@ fun main() {
         ColorStateManager.currentColors.add(bassColor)
     }
 
-    while (true) {
-        val client = server.accept()
-        println("Client connected: ${client.inetAddress.hostAddress}")
-
-        // This timeout is fairly arbitrary; I just don't want to keep firing data to clients that no longer exist.
-        client.soTimeout = 1000
-        client.tcpNoDelay = true;
-
-        // Run client in it's own thread.
-        thread { ClientHandler(client).run() }
-    }
+    // Initialize server
+    val server = Server()
+    server.run()
 }
 
-class ClientHandler(client: Socket) {
+class Server() {
 
-    private val client: Socket = client
-    private val reader: Scanner = Scanner(client.getInputStream())
-    private val writer: OutputStream = client.getOutputStream()
-    private var running: Boolean = false
-    private var ledCount: Int = 0
+    // The master socket will handle client configuration information
+    // The client socket(s) will send color data to the respective client; there will be a 1-to-1 relationship
+    private lateinit var masterSocket: DatagramSocket
+    private val clients: MutableList<Client> = mutableListOf()
+
+    // TODO: Server should clean up inactive clients
 
     fun run() {
-        running = true
+        masterSocket = DatagramSocket(9999)
+        println("Socket is running on port ${masterSocket.localPort}")
 
-        while (running) {
-            //Check for message(s) from the client
-            if (reader.hasNextLine()) {
-                val message = reader.nextLine()
-                received(message)
-            }
+        while (true) {
 
-            //If we don't have an LED length, then there is no point in running calculations.
-            if (ledCount <= 0) {
-                continue
-            }
-
-            //Create our color message
-            val ledData = ColorStateManager.interpolateForLED(ledCount)
-            val rgbMessages = ledData.map { it.toString() }
-            val rgbFullMessage = rgbMessages.joinToString("|")
-
-            //Send our colors to the client
-            write(rgbFullMessage)
         }
+    }
+
+//    while (true) {
+//        val client = server.accept()
+//        println("Client connected: ${client.inetAddress.hostAddress}")
+//
+//        // Run client in it's own thread.
+//        thread { ClientHandler(client).run() }
+//    }
+
+}
+
+class Client(port: Int, mps: Int) {
+
+    private val socket = DatagramSocket(port)
+    private val timer = Timer()
+    private var ledCount = 0
+
+    init {
+        timer.scheduleAtFixedRate(object : TimerTask() {
+            override fun run() {
+                checkForMessage()
+                sendColors()
+            }
+        }, 0, (1000 / mps).toLong())
+    }
+
+    //Socket
+    private fun readNextMessage(): String? {
+        // TODO:
+        return null
     }
 
     private fun write(message: String) {
+        // TODO:
         println("Writing: $message")
-
-        val message = (message + '\n')
-        val byteArray = message.toByteArray(Charset.defaultCharset())
-        writer.write(byteArray)
     }
 
-    private fun received(message: String) {
-        //End the client session
+    //Reading Steps
+    fun checkForMessage() {
+        //TODO: Maybe we need to handle multiple messages
+        val message = readNextMessage()
+        if (message == null) { return }
+
+        checkForExit(message)
+        if (socket.isClosed) { return }
+
+        checkForHeartbeat(message)
+        checkForLedCount(message)
+    }
+
+    private fun checkForExit(message: String) {
         if (message == "EXIT") {
-            running = false
-            client.close()
-            println("${client.inetAddress.hostAddress} closed the connection")
+            timer.cancel()
+            socket.close()
+            println("${socket.inetAddress.hostAddress} closed the connection")
         }
+    }
+
+    // TODO: We need a way to clean up clients when they go offline; probably a heartbeat
+    private fun checkForHeartbeat(message: String) {
+        // TODO:
+        // Check a heartbeat time has been sent
+        // If so, set the last heartbeat
+        // If not, check if we have timed out
+        // If so, close the client
+        println("Check heartbeat")
 
         //Update the number of LEDs the client is displaying to
+
+    }
+
+    fun checkForLedCount(message: String) {
         if (message.startsWith("LEDCOUNT=")) {
             val countString = message.removePrefix("LEDCOUNT=")
             ledCount = countString.toInt()
@@ -94,4 +117,57 @@ class ClientHandler(client: Socket) {
         }
     }
 
+    //Writing Steps
+    var bool = true
+    fun sendColors() {
+        //If we don't have an LED length, then there is no point in running calculations.
+        if (ledCount <= 0) {
+            return
+        }
+
+        if (bool == true) {
+            write("FF0000|FF0000")
+            bool = false
+        } else {
+            write("0000FF|0000FF")
+            bool = true
+        }
+
+        // TODO:
+        //Create our color message
+        //val ledData = ColorStateManager.interpolateForLED(12)
+        //val rgbMessages = ledData.map { it.toHex() }
+        //val rgbFullMessage = rgbMessages.joinToString("|")
+
+        //Send our colors to the client
+        //write(rgbFullMessage)
+    }
+
 }
+
+//class ClientHandler(client: Socket) {
+//
+//    private val client: Socket = client
+//    private val reader: Scanner = Scanner(client.getInputStream())
+//    private val writer: OutputStream = client.getOutputStream()
+//    private var running: Boolean = false
+//    private var ledCount: Int = 0
+//
+//    fun run() {
+//        running = true
+//
+//        while (running) {
+//            //Check for message(s) from the client
+//            if (reader.hasNextLine()) {
+//                val message = reader.nextLine()
+//                received(message)
+//            }
+//
+//        }
+//    }
+//
+//    private fun received(message: String) {
+
+//    }
+//
+//}
